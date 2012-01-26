@@ -1,6 +1,9 @@
 var util = require("util");
 var events = require("events");
 
+// SemVer http://semver.org/
+var version = '1.0.0';
+
 /**
  *  Matches a line from nodes stacktrace
  *  2 = object.function
@@ -10,6 +13,7 @@ var events = require("events");
  */
 var pattern = new RegExp(/^at (([^ ]+) )?(\(?([^:]+)*:([0-9]+)*:([0-9]+)*\)?)?$/g);
 var slice = Array.prototype.slice;
+var eventNames = ['data', 'log', 'info', 'warn', 'error'];
 
 function parseStackLine(line) {
     var match, stack = [];
@@ -27,16 +31,14 @@ function parseStackLine(line) {
 function getRawTrace() {
     var err = new Error;
     Error.captureStackTrace(err, arguments.callee);
-    // splice(3) uuuuhuhuuuuu magic number alert.
-    // we kick the first 3 elements from the beginning. these 3 elements
-    // are the 3 calls from within this module.
+    // splice(4)  ohh ohh - magic number alert.
+    // we kick the first 4 elements from the beginning. these 4 elements
+    // are the 4 calls from within this module.
     return err.stack.split("\n").splice(4) || [];
 }
 
 function getTrace() {
-    var rawStack = getRawTrace();
-    var stack = [], stackLine;
-
+    var rawStack = getRawTrace(), stack = [], stackLine;
     rawStack.forEach(function (line) {
         line = line.trim();
         stackLine = parseStackLine(line);
@@ -50,37 +52,54 @@ function getCalleeTrace() {
     return parseStackLine(rawCalleeLine)[0] || {};
 }
 
-function defaultHandler(level, label, file, line, char, args) {
+function defaultListener(level, label, file, line, char, args) {
     this.out("[" + label + "] [" + level.toUpperCase() + "] (" + file + ":" + line + ":" + char + ") " + util.format.apply(this, args));
 }
 
-function emit(level, args) {
-    var trace = getCalleeTrace();
-    var label = this.label || "";
-    var path = trace.path || "";
-    var line = trace.line || "";
-    var char = trace.char || "";
-    this.emit.apply(this, ['data', level, label, path, line, char, args]);
-    this.emit.apply(this, [level, label, path, line, char, args]);
+function hasListener() {
+    var that = this, hasListeners = false;
+    eventNames.forEach(function (eventName) {
+        if (that.listeners(eventName).length > 0) {
+            hasListeners = true;
+        }
+    });
+    return hasListeners;
+}
+
+function emitHelper(level, args) {
+    var trace = getCalleeTrace(), label = this.label || "", path = trace.path || "", line = trace.line || "", char = trace.char || "", tEmit = this.emit;
+    if (!this.relayed && !hasListener.call(this)) {
+        this.registerDefaultListener.call(this);
+    }
+    tEmit.apply(this, ['data', level, label, path, line, char, args]);
+    tEmit.apply(this, [level, label, path, line, char, args]);
+}
+
+function create(label) {
+    return new Konsole(label || "");
 }
 
 function Konsole(label) {
     events.EventEmitter.call(this);
     this.label = label;
 }
+Konsole.create = create;
 util.inherits(Konsole, events.EventEmitter);
 
+/**
+ * console API
+ */
 Konsole.prototype.log = function () {
-    emit.apply(this, ["log", slice.call(arguments)]);
+    emitHelper.apply(this, ["log", slice.call(arguments)]);
 }
 Konsole.prototype.info = function () {
-    emit.apply(this, ["info", slice.call(arguments)]);
+    emitHelper.apply(this, ["info", slice.call(arguments)]);
 }
 Konsole.prototype.warn = function () {
-    emit.apply(this, ["warn", slice.call(arguments)]);
+    emitHelper.apply(this, ["warn", slice.call(arguments)]);
 }
 Konsole.prototype.error = function () {
-    emit.apply(this, ["error", slice.call(arguments)]);
+    emitHelper.apply(this, ["error", slice.call(arguments)]);
 }
 Konsole.prototype.dir = console.dir;
 Konsole.prototype.time = console.time;
@@ -88,17 +107,31 @@ Konsole.prototype.timeEnd = console.timeEnd;
 Konsole.prototype.trace = console.trace;
 Konsole.prototype.assert = console.assert;
 
+/**
+ * Konsole API
+ */
 Konsole.prototype.out = function () {
     process.stdout.write(util.format.apply(this, arguments) + '\n');
 }
-Konsole.prototype.relayEvents = function (origin) {
-    var that = this;
-    origin.on("data", function () {
-        that.emit.apply(that, ["data"].concat(slice.call(arguments)));
-    });
+Konsole.prototype.relay = function () {
+    var that = this, origins = slice.call(arguments);
+    origins.forEach(function (origin) {
+        origin.relayed = true;
+        origin.on("data", function () {
+            if (!that.relayed && !hasListener.call(that)) {
+                that.registerDefaultListener.call(that);
+            }
+            that.emit.apply(that, ["data"].concat(slice.call(arguments)));
+            that.emit.apply(that, slice.call(arguments));
+        });
+    })
 }
-Konsole.prototype.registerDefaultHandler = function () {
-    this.on("data", defaultHandler);
+Konsole.prototype.registerDefaultListener = function () {
+    this.on("data", defaultListener);
 }
+Konsole.prototype.create = create;
+Konsole.prototype.version = version;
+Konsole.prototype.relayed = false;
+Konsole.prototype.label = "";
 
 module.exports = Konsole;
