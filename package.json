@@ -1,8 +1,8 @@
 {
   "author": "Thomas Fritz <fritztho@gmail.com> (http://fritzthomas.com)",
   "name": "konsole",
-  "description": "EventEmitter powered console",
-  "version": "0.0.1",
+  "description": "EventEmitter powered console for better logging capabalities for libraries",
+  "version": "1.0.0",
   "homepage": "https://github.com/thomasfr/node-konsole",
   "repository": {
     "type": "git",
