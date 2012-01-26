@@ -50,8 +50,8 @@ function getCalleeTrace() {
     return parseStackLine(rawCalleeLine)[0] || {};
 }
 
-function defaultHandler(level, label, path, line, args) {
-    this.out("[" + label + "] [" + level.toUpperCase() + "] (" + path + ":" + line + ") " + util.format.apply(this, args));
+function defaultHandler(level, label, path, line, char, args) {
+    this.out("[" + label + "] [" + level.toUpperCase() + "] (" + file + ":" + line + ":" + char + ") " + util.format.apply(this, args));
 }
 
 function emit(level, args) {
@@ -59,8 +59,9 @@ function emit(level, args) {
     var label = this.label || "";
     var path = trace.path || "";
     var line = trace.line || "";
-    this.emit.apply(this, ['data', level, label, path, line, args]);
-    this.emit.apply(this, [level, label, path, line, args]);
+    var char = trace.char || "";
+    this.emit.apply(this, ['data', level, label, path, line, char, args]);
+    this.emit.apply(this, [level, label, path, line, char, args]);
 }
 
 function Konsole(label) {

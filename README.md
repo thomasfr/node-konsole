@@ -10,18 +10,18 @@ var util = require("util");
 var Konsole = require("konsole");
 var konsole = new Konsole("my-module-name");
 
-konsole.on("data", function(level, label, file, line, args) {
-    this.out("[" + label + "] [" + level.toUpperCase() + "] (" + path + ":" + line + ") " + util.format.apply(this, args));
+konsole.on("data", function(level, label, file, line, char, args) {
+    this.out("[" + label + "] [" + level.toUpperCase() + "] (" + file + ":" + line + ":"+char+") " + util.format.apply(this, args));
 });
 
 
-konsole.on("error", function(label, file, line, args) {
+konsole.on("error", function(label, file, line, char, args) {
     process.exit(1);
 });
 
 
-konsole.log("This will not write to stdout"); // It will emit a 'data' event and a 'log' event.
-konsole.error("This will not write to stdout"); // It will emit a 'data' event and a 'error' event.
+konsole.log("This log message gets not written to stdout"); // It will emit a 'data' event and a 'log' event.
+konsole.error("This error message gets not written to stderr"); // It will emit a 'data' event and a 'error' event.
 
 
 ```
