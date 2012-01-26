@@ -4,6 +4,8 @@ konsole and console APIs are identical. So you can easily replace all your `cons
 
 ## Usage
 
+    npm install konsole
+
 ```JavaScript
 
 var util = require("util");
