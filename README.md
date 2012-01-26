@@ -4,7 +4,12 @@ konsole and console APIs are identical. So you can easily replace all your `cons
 
 ## Usage
 
+### Installation
+
     npm install konsole
+
+
+### Example usage
 
 ```JavaScript
 
@@ -18,6 +23,14 @@ var foo = require("foo");
 konsole.label = "example:k1";
 
 // Register a event handler for all logs, regardless of the level.
+// the data event callback will get the following arguments:
+// level: log|info|warn|error
+// label: the given label or an empty string
+// file: the full path to the file where konsole log were called
+// line: the line number where konsole log were called
+// char: the char number of the konsole log call
+// args: an array of arguments passed to the originated konsole call
+// @scope: konsole
 konsole.on("data", function (level, label, file, line, char, args) {
     this.out("MY Log Handler [module: " + label + "] " + level.toUpperCase() + " " + file + ":" + line + " '" + util.format.apply(this, args) + "'");
 });
@@ -41,7 +54,33 @@ var io = socketio.listen(app);
 konsole2.info("info from konsole2"); // It will emit a 'data' event and a 'info' event relayer on the konsole object.
 konsole.warn("Warning"); // It will emit a 'data' event and a 'warn' event.
 
+```
 
+
+### Example above will output
+
+```
+MY Log Handler [module: example:k1] LOG /home/thomas/programming/konsole/examples/index.js:29 'This log message gets not written to stdout'
+MY Log Handler [module: example:k1] INFO /home/thomas/programming/konsole/examples/index.js:30 'Instead it emits an event on which you can listen with additional information'
+MY Log Handler [module: express] INFO /home/thomas/programming/konsole/examples/node_modules/express/index.js:4 'listening on 3000 in development mode'
+MY Log Handler [module: socketio] INFO /home/thomas/programming/konsole/examples/node_modules/socketio/index.js:4 'Socket.IO started'
+MY Log Handler [module: foo] LOG /home/thomas/programming/konsole/examples/node_modules/foo/index.js:4 'I am doing something'
+MY Log Handler [module: example:k2] INFO /home/thomas/programming/konsole/examples/index.js:38 'info from konsole2'
+MY Log Handler [module: foo] WARN /home/thomas/programming/konsole/examples/node_modules/foo/index.js:8 'Nooooo!'
+MY Log Handler [module: example:k1] WARN /home/thomas/programming/konsole/examples/index.js:40 'Warning'
+```
+
+### Default Listener will output
+
+```
+[example:k1] [LOG] (/home/thomas/Projekte/Privat/konsole/examples/index.js:29:9) This log message gets not written to stdout
+[example:k1] [INFO] (/home/thomas/Projekte/Privat/konsole/examples/index.js:30:9) Instead it emits an event on which you can listen with additional information
+[express] [INFO] (/home/thomas/Projekte/Privat/konsole/examples/node_modules/express/index.js:4:13) listening on 3000 in development mode
+[socketio] [INFO] (/home/thomas/Projekte/Privat/konsole/examples/node_modules/socketio/index.js:4:13) Socket.IO started
+[foo] [LOG] (/home/thomas/Projekte/Privat/konsole/examples/node_modules/foo/index.js:4:13) I am doing something
+[example:k2] [INFO] (/home/thomas/Projekte/Privat/konsole/examples/index.js:38:10) info from konsole2
+[foo] [WARN] (/home/thomas/Projekte/Privat/konsole/examples/node_modules/foo/index.js:8:13) Nooooo!
+[example:k1] [WARN] (/home/thomas/Projekte/Privat/konsole/examples/index.js:40:9) Warning
 ```
 
 ## License
