@@ -50,7 +50,7 @@ function getCalleeTrace() {
     return parseStackLine(rawCalleeLine)[0] || {};
 }
 
-function defaultHandler(level, label, path, line, char, args) {
+function defaultHandler(level, label, file, line, char, args) {
     this.out("[" + label + "] [" + level.toUpperCase() + "] (" + file + ":" + line + ":" + char + ") " + util.format.apply(this, args));
 }
 
