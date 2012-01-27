@@ -2,18 +2,17 @@ var util = require("util");
 var events = require("events");
 
 // SemVer http://semver.org/
-var version = '1.0.0';
+var version = '2.0.0';
 
-/**
- *  Matches a line from nodes stacktrace
- *  2 = object.function
- *  4 = file path
- *  5 = line
- *  6 = char
- */
 var pattern = new RegExp(/^at (([^ ]+) )?(\(?([^:]+)*:([0-9]+)*:([0-9]+)*\)?)?$/g);
 var slice = Array.prototype.slice;
-var eventNames = ['data', 'log', 'info', 'warn', 'error'];
+var globalEventName = "message";
+var eventNames = [globalEventName, 'log', 'info', 'warn', 'error'];
+var overrides = ['log', 'info', 'warn', 'error'];
+var proxies = ['dir', 'time', 'timeEnd', 'trace', 'assert'];
+var consoleLabel = "console";
+var createTrace = true;
+var emptyStack = {object:null, path:null, line:null, char:null};
 
 function parseStackLine(line) {
     var match, stack = [];
@@ -25,35 +24,30 @@ function parseStackLine(line) {
             "char":match[6] || null
         });
     }
-    return stack;
-}
-
-function getRawTrace() {
-    var err = new Error;
-    Error.captureStackTrace(err, arguments.callee);
-    // splice(4)  ohh ohh - magic number alert.
-    // we kick the first 4 elements from the beginning. these 4 elements
-    // are the 4 calls from within this module.
-    return err.stack.split("\n").splice(4) || [];
+    return stack[0] || emptyStack;
 }
 
 function getTrace() {
-    var rawStack = getRawTrace(), stack = [], stackLine;
-    rawStack.forEach(function (line) {
+    if (!this.trace) {
+        return emptyStack;
+    }
+    else {
+        var line = getTraceLine();
+        return parseStackLine(line);
+    }
+}
+
+function getTraceLine() {
+    var err = new Error;
+    Error.captureStackTrace(err, arguments.callee);
+    var stack = err.stack.split("\n").splice(1), i = 0, l = stack.length, line = ""; // First line is "Error"
+    for (i; i < l; i++) {
+        line = stack[i] || "";
         line = line.trim();
-        stackLine = parseStackLine(line);
-        stack.push(stackLine);
-    });
-    return stack;
-}
-
-function getCalleeTrace() {
-    var rawCalleeLine = getRawTrace()[0].trim() || "";
-    return parseStackLine(rawCalleeLine)[0] || {};
-}
-
-function defaultListener(level, label, file, line, char, args) {
-    this.out("[" + label + "] [" + level.toUpperCase() + "] (" + file + ":" + line + ":" + char + ") " + util.format.apply(this, args));
+        if (!(new RegExp(__filename)).test(line)) {
+            return line;
+        }
+    }
 }
 
 function hasListener() {
@@ -67,71 +61,90 @@ function hasListener() {
 }
 
 function emitHelper(level, args) {
-    var trace = getCalleeTrace(), label = this.label || "", path = trace.path || "", line = trace.line || "", char = trace.char || "", tEmit = this.emit;
-    if (!this.relayed && !hasListener.call(this)) {
-        this.registerDefaultListener.call(this);
+    var trace = getTrace.call(this),
+        label = this.label || "",
+        pid = process.pid,
+        pType = (process.env.NODE_WORKER_ID ? 'worker' : 'master'),
+        tEmit = this.emit,
+        relayed = this.relayed;
+    if (!relayed && !hasListener.call(this)) {
+        this.on(globalEventName, this.defaultListener);
     }
-    tEmit.apply(this, ['data', level, label, path, line, char, args]);
-    tEmit.apply(this, [level, label, path, line, char, args]);
+    tEmit.apply(this, [globalEventName, level, label, args, pid, pType, trace]);
+    tEmit.apply(this, [level, label, args, pid, pType, trace]);
 }
 
-function create(label) {
-    return new Konsole(label || "");
-}
-
-function Konsole(label) {
+function Konsole(label, options) {
     events.EventEmitter.call(this);
-    this.label = label;
+    options = options || {};
+    if (options.trace == false) this.trace = false;
+    this.label = label || "";
 }
-Konsole.create = create;
+
 util.inherits(Konsole, events.EventEmitter);
 
 /**
- * console API
+ * console API Overrides and Proxies
  */
-Konsole.prototype.log = function () {
-    emitHelper.apply(this, ["log", slice.call(arguments)]);
-}
-Konsole.prototype.info = function () {
-    emitHelper.apply(this, ["info", slice.call(arguments)]);
-}
-Konsole.prototype.warn = function () {
-    emitHelper.apply(this, ["warn", slice.call(arguments)]);
-}
-Konsole.prototype.error = function () {
-    emitHelper.apply(this, ["error", slice.call(arguments)]);
-}
-Konsole.prototype.dir = console.dir;
-Konsole.prototype.time = console.time;
-Konsole.prototype.timeEnd = console.timeEnd;
-Konsole.prototype.trace = console.trace;
-Konsole.prototype.assert = console.assert;
+overrides.forEach(function (funcName) {
+    Konsole.prototype[funcName] = function () {
+        emitHelper.apply(this, [funcName, slice.call(arguments)]);
+    }
+});
+proxies.forEach(function (funcName) {
+    Konsole.prototype[funcName] = function () {
+        return console[funcName].apply(console, arguments);
+    }
+});
 
 /**
  * Konsole API
  */
-Konsole.prototype.out = function () {
+Konsole.prototype.write = function () {
     process.stdout.write(util.format.apply(this, arguments) + '\n');
 }
 Konsole.prototype.relay = function () {
-    var that = this, origins = slice.call(arguments);
+    var that = this, origins = slice.call(arguments), tEmit = that.emit;
     origins.forEach(function (origin) {
         origin.relayed = true;
-        origin.on("data", function () {
+        origin.on(globalEventName, function () {
             if (!that.relayed && !hasListener.call(that)) {
-                that.registerDefaultListener.call(that);
+                that.on(globalEventName, that.defaultListener);
             }
-            that.emit.apply(that, ["data"].concat(slice.call(arguments)));
-            that.emit.apply(that, slice.call(arguments));
+            tEmit.apply(that, [globalEventName].concat(slice.call(arguments)));
+            tEmit.apply(that, slice.call(arguments));
         });
-    })
+    });
 }
-Konsole.prototype.registerDefaultListener = function () {
-    this.on("data", defaultListener);
+Konsole.prototype.defaultListener = function (level, label, args, pid, pType, trace) {
+    this.write("[" + label + ":" + pType + ":" + pid + "] " + level.toUpperCase() + " " + trace.path + ":" + trace.line + ":" + trace.char + " '" + util.format.apply(this, args) + "'");
 }
-Konsole.prototype.create = create;
 Konsole.prototype.version = version;
 Konsole.prototype.relayed = false;
+Konsole.prototype.trace = createTrace;
 Konsole.prototype.label = "";
 
-module.exports = Konsole;
+module.exports = function (consoleOverride, options) {
+    if (consoleOverride !== false && typeof consoleOverride !== "string") {
+        var orig = {}, konsole = new Konsole(consoleLabel, options);
+        overrides.forEach(function (funcName) {
+            orig[funcName] = console[funcName];
+            console[funcName] = function () {
+                return konsole[funcName].apply(konsole, arguments);
+            }
+            console.on = function () {
+                return konsole.on.apply(konsole, arguments);
+            }
+        });
+        return function () {
+            overrides.forEach(function (funcName) {
+                console[funcName] = orig[funcName];
+            });
+            delete console.on;
+        }
+    }
+    else {
+        // consoleOverride used as label here. Everything else than false expected
+        return new Konsole(consoleOverride, options);
+    }
+};
