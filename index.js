@@ -108,8 +108,8 @@ proto.relay = function () {
         });
     });
 }
-proto.defaultListener = function (level, label, args, pid, pType, trace) {
-    this.write("[" + label + ":" + pType + ":" + pid + "] " + level.toUpperCase() + " " + trace.path + ":" + trace.line + ":" + trace.char + " '" + format.apply(this, args) + "'");
+proto.defaultListener = function (level, label, args, pid, pType, trace, diff) {
+    this.write(" " + label + " " + pType + ":" + pid + "\t" + level.toUpperCase() + "\t" + (diff !== null ? "+" + diff + "ms " : "" ) + (trace.path ? "(" + trace.path : "") + (trace.line ? ":" + trace.line + ") " : "") + "'" + this.format.apply(this, args) + "'");
 }
 proto.version = version;
 proto.relayed = false;
@@ -123,8 +123,7 @@ proto.timeEnd = function (label) {
 };
 
 module.exports = function (consoleOverride, options) {
-    process.stdout.write(typeof consoleOverride + "\n");
-    if (typeof consoleOverride === "object") {
+    if (typeof consoleOverride === "object" || typeof consoleOverride === "undefined") {
         options = consoleOverride;
         var orig = {}, konsole = new Konsole(consoleLabel, options);
         overrides.forEach(function (funcName) {

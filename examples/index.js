@@ -1,5 +1,5 @@
 var Konsole = require("konsole");
-var restoreConsole = Konsole({trace:true, diff:true});
+var restoreConsole = Konsole({trace:false, diff:false});
 
 // Since now console got overriden from konsole. You can use console just as you did before.
 console.time("foo");
