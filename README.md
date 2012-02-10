@@ -1,7 +1,11 @@
 # EventEmitter powered console implementation
 
-konsole and console APIs are identical. So you can easily replace all your `console.log`, `console.warn`, `console.info` and `console.err` and every other `console` method call with a konsole call.
-Since version 2.0.0 konsole overrides the console calls. So you do not have to replace your console calls. You will just have to `require("konsole")();` and all your console calls are kept back from written to stdout and konsole will emit instead a `message`event.
+konsole and console APIs are identical.
+So you can easily replace all your `console.log`, `console.warn`, `console.info` and `console.err` and
+every other `console` method call with a konsole call.
+Since version 2.0.0 konsole overrides the console calls. So you do not have to replace your console calls.
+You will just have to `require("konsole")();` and all your console calls are kept back from written to stdout and
+konsole will emit instead a `message`event.
 
 ## Usage
 
@@ -17,9 +21,14 @@ Since version 2.0.0 konsole overrides the console calls. So you do not have to r
 ```JavaScript
 
 var Konsole = require("konsole");
-var restoreConsole = Konsole({trace:false, diff:false});
 
-// Since now console got overriden from konsole. You can use console just as you did before.
+// We could switch trace and diff to off. By default this is enabled
+// Switch it off in production and it will never generate those.
+// and a diff in ms to the latest console call with the same label.
+// If you call restoreConsole it will restore the original console object
+var restoreConsole = Konsole({trace:true, diff:true});
+
+// console got overriden from konsole. You can use console just as you used it before
 console.time("foo");
 
 var socketio = require("socketio");
@@ -29,25 +38,31 @@ var foo = require("foo");
 setInterval(doSomething, 4200);
 
 // Without registering any listener to console, nothing will ever be written to stdout or elsewhere. Its completly up to you
-// The callbacks scope is konsole, so you have access to utility functions like write (process.stdout.write) and format (util.format)
+// to handle console events
 console.on("message", function (level, label, args, pid, pType, trace, diff) {
     this.write(" " + label + " " + pType + ":" + pid + "\t" + level.toUpperCase() + "\t" + (diff !== null ? "+" + diff + "ms " : "" ) + (trace.path ? "(" + trace.path : "") + (trace.line ? ":" + trace.line + ") " : "") + "'" + this.format.apply(this, args) + "'");
 });
 
-var bar = require("bar");
 
 // you can also create multiple konsoles with a different label.
+// We want to relay events from this konsole to our "main" console object
+// so we add it to the relay call.
 var konsole = Konsole("konsole");
-
 
 // Lets assume that socketio, express or any other library are using konsole.
 // To get all logs from those modules we would just relay those konsole events
-// We can do this just with:
+// You can add as many konsole objects as you like.
 console.relay(socketio.konsole, express.konsole, konsole);
+
+// bar module itself does not export a konsole object, but uses
+// console.* directly. If you let Konsole override console it will
+//  catch all logs and it will trigger a message event instead of writing to stdout.
+var bar = require("bar");
+
 konsole.log("konsole");
 
-console.log("This log message gets not written to stdout"); // It will emit a 'message' event and a 'log' event.
-console.info("Instead it emits an event on which you can listen with additional information"); // It will emit a 'message' event and a 'info' event.
+console.log("This log message gets not written to stdout"); // This will emit a 'message' event and a 'log' event.
+console.info("Instead it emits an event on which you can listen with additional information"); // This will emit a 'message' event and a 'info' event.
 function doSomething() {
     konsole.info("I did something");
 }
@@ -61,15 +76,17 @@ foo.doSomething();
 
 console.timeEnd("foo");
 
-konsole.info("info from another konsole with a different label"); // It will emit a 'message' event and a 'info' event relayer on the konsole object.
+// This will emit a 'message' event and a 'info' event relayed to  console object.
+konsole.info("info from another konsole with a different label");
 console.log("process.versions: ", process.versions);
 
-// You can restore the old console object. Since now everything works just
-// before and does not emit an event
+// You can restore the old console object. Since then everything works just
+// before and does not emit an event anymore.
 //restoreConsole();
 
 foo.doSomethingElse();
 console.warn("Warning");
+
 
 ```
 
@@ -81,10 +98,10 @@ var cluster = require('cluster');
 var http = require('http');
 var numCPUs = require('os').cpus().length;
 
-// Without registering any listener to console, nothing will ever be written to stdout or elsewhere. Its completly up to you
-console.on("message", function (level, label, args, pid, pType, trace, diff) {
-    this.write(" " + label + " " + pType + ":" + pid + "\t" + level.toUpperCase() + "\t" + (diff !== null ? "+" + diff + "ms " : "" ) + (trace.path ? "(" + trace.path : "") + (trace.line ? ":" + trace.line + ") " : "") + "'" + this.format.apply(this, args) + "'");
-});
+// Add the defaultListener, which will write every message to stdout.
+// The defaultListener will also check if there is a trace and a diff
+// otherwise it will display a shorter log.
+console.addDefaultListener();
 
 if (cluster.isMaster) {
     // Fork workers.
@@ -106,61 +123,78 @@ if (cluster.isMaster) {
         }).listen(8000);
     console.log("Worker online");
 }
+
 ```
 
 ### Example above will output
 
+#### node examples/index.js output
+
 ```
 $ node examples/index.js
- console master:5654    LOG     +0ms (/home/thomas/Projekte/Privat/konsole/examples/node_modules/bar/index.js:1) 'Ich bin bar'
- konsole master:5654    LOG     +0ms (/home/thomas/Projekte/Privat/konsole/examples/index.js:28) 'konsole'
- console master:5654    LOG     +8ms (/home/thomas/Projekte/Privat/konsole/examples/index.js:30) 'This log message gets not written to stdout'
- console master:5654    INFO    +1ms (/home/thomas/Projekte/Privat/konsole/examples/index.js:31) 'Instead it emits an event on which you can listen with additional information'
- express master:5654    INFO    +0ms (/home/thomas/Projekte/Privat/konsole/examples/node_modules/express/index.js:4) 'listening on 3000 in development mode'
- socketio master:5654   INFO    +0ms (/home/thomas/Projekte/Privat/konsole/examples/node_modules/socketio/index.js:4) 'Socket.IO started'
- console master:5654    LOG     +2ms (/home/thomas/Projekte/Privat/konsole/examples/node_modules/foo/index.js:4) 'I am doing something'
- console master:5654    LOG     +0ms (/home/thomas/Projekte/Privat/konsole/examples/index.js:43) 'foo: 17ms'
- konsole master:5654    INFO    +3ms (/home/thomas/Projekte/Privat/konsole/examples/index.js:45) 'info from another konsole with a different label'
- console master:5654    LOG     +1ms (/home/thomas/Projekte/Privat/konsole/examples/index.js:46) 'process.versions:  { node: '0.6.8',
-  v8: '3.6.6.19',
+ console master:6565    LOG     +0ms (/home/developer/projects/konsole/examples/node_modules/bar/index.js:1) 'I am bar'
+ konsole master:6565    LOG     +0ms (/home/developer/projects/konsole/examples/index.js:40) 'konsole'
+ console master:6565    LOG     +8ms (/home/developer/projects/konsole/examples/index.js:42) 'This log message gets not written to stdout'
+ console master:6565    INFO    +1ms (/home/developer/projects/konsole/examples/index.js:43) 'Instead it emits an event on which you can listen with additional information'
+ express master:6565    INFO    +0ms (/home/developer/projects/konsole/examples/node_modules/express/index.js:4) 'listening on 3000 in development mode'
+ socketio master:6565   INFO    +0ms (/home/developer/projects/konsole/examples/node_modules/socketio/index.js:4) 'Socket.IO started'
+ console master:6565    LOG     +2ms (/home/developer/projects/konsole/examples/node_modules/foo/index.js:4) 'I am doing something'
+ console master:6565    LOG     +0ms (/home/developer/projects/konsole/examples/index.js:55) 'foo: 17ms'
+ konsole master:6565    INFO    +4ms (/home/developer/projects/konsole/examples/index.js:58) 'info from another konsole with a different label'
+ console master:6565    LOG     +1ms (/home/developer/projects/konsole/examples/index.js:59) 'process.versions:  { node: '0.6.10',
+  v8: '3.6.6.20',
   ares: '1.7.5-DEV',
   uv: '0.6',
   openssl: '0.9.8o' }'
- console master:5654    WARN    +1ms (/home/thomas/Projekte/Privat/konsole/examples/node_modules/foo/index.js:8) 'Nooooo!'
- console master:5654    WARN    +0ms (/home/thomas/Projekte/Privat/konsole/examples/index.js:53) 'Warning'
- socketio master:5654   LOG     +1937ms (/home/thomas/Projekte/Privat/konsole/examples/node_modules/socketio/index.js:8) 'Heartbeat 1327762973228'
- socketio master:5654   LOG     +1999ms (/home/thomas/Projekte/Privat/konsole/examples/node_modules/socketio/index.js:8) 'Heartbeat 1327762975227'
- konsole master:5654    INFO    +4135ms (/home/thomas/Projekte/Privat/konsole/examples/index.js:33) 'I did something'
- console master:5654    LOG     +4934ms (/home/thomas/Projekte/Privat/konsole/examples/node_modules/foo/index.js:13) 'Did this and that'
- console master:5654    WARN    +1ms (/home/thomas/Projekte/Privat/konsole/examples/node_modules/foo/index.js:8) 'Nooooo!'
- socketio master:5654   LOG     +2001ms (/home/thomas/Projekte/Privat/konsole/examples/node_modules/socketio/index.js:8) 'Heartbeat 1327762977228'
+ console master:6565    WARN    +1ms (/home/developer/projects/konsole/examples/node_modules/foo/index.js:8) 'Nooooo!'
+ console master:6565    WARN    +1ms (/home/developer/projects/konsole/examples/index.js:66) 'Warning'
+ socketio master:6565   LOG     +1941ms (/home/developer/projects/konsole/examples/node_modules/socketio/index.js:8) 'Heartbeat 1328900455247'
+ socketio master:6565   LOG     +2000ms (/home/developer/projects/konsole/examples/node_modules/socketio/index.js:8) 'Heartbeat 1328900457247'
+ konsole master:6565    INFO    +4138ms (/home/developer/projects/konsole/examples/index.js:45) 'I did something'
+ console master:6565    LOG     +4937ms (/home/developer/projects/konsole/examples/node_modules/foo/index.js:13) 'Did this and that'
+ console master:6565    WARN    +1ms (/home/developer/projects/konsole/examples/node_modules/foo/index.js:8) 'Nooooo!'
+ socketio master:6565   LOG     +2000ms (/home/developer/projects/konsole/examples/node_modules/socketio/index.js:8) 'Heartbeat 1328900459247'
+ express master:6565    LOG     +6942ms (/home/developer/projects/konsole/examples/node_modules/express/index.js:8) 'Request'
+
 ```
+
+#### node examples/cluster.js output
 
 ```
 $ node examples/cluster.js
- console master:5703    LOG     +0ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:20) 'Listening on http://127.0.0.1:8000'
- console worker:5705    LOG     +0ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:29) 'Worker online'
- console worker:5706    LOG     +0ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:29) 'Worker online'
- console worker:5706    LOG     +2469ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5706    LOG     +155ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /favicon.ico'
- console worker:5706    LOG     +363ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5706    LOG     +85ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /favicon.ico'
- console worker:5706    LOG     +26ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5706    LOG     +216ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5706    LOG     +88ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /favicon.ico'
- console worker:5705    LOG     +3423ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5705    LOG     +142ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5705    LOG     +8ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5705    LOG     +109ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5705    LOG     +9ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5705    LOG     +6ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5705    LOG     +8ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5705    LOG     +81ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5705    LOG     +4ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5705    LOG     +9ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5705    LOG     +63ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5705    LOG     +94ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /'
- console worker:5705    LOG     +206ms (/home/thomas/Projekte/Privat/konsole/examples/cluster.js:25) 'Request:  /favicon.ico'
+ console master:6576 LOG +0ms (/home/developer/projects/konsole/examples/cluster.js:20) 'Listening on http://127.0.0.1:8000'
+ console worker:6579 LOG +0ms (/home/developer/projects/konsole/examples/cluster.js:29) 'Worker online'
+ console worker:6578 LOG +0ms (/home/developer/projects/konsole/examples/cluster.js:29) 'Worker online'
+ console worker:6579 LOG +7777ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6579 LOG +220ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /favicon.ico'
+ console worker:6579 LOG +295ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6579 LOG +226ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /favicon.ico'
+ console worker:6579 LOG +8ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6579 LOG +5ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6579 LOG +2ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6579 LOG +110ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +8617ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +300ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +128ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +5ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +17ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +218ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +636ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +290ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +121ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +8ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +3ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +3ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +102ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +107ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +119ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +132ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +94ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +76ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +70ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +122ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /'
+ console worker:6578 LOG +1499ms (/home/developer/projects/konsole/examples/cluster.js:25) 'Request:  /favicon.ico'
+
  ```
 
 ## License
