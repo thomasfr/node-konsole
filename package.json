@@ -1,18 +1,20 @@
 {
-  "author": "Thomas Fritz <fritztho@gmail.com> (http://fritzthomas.com)",
-  "name": "konsole",
-  "description": "EventEmitter powered console for better logging capabalities for libraries",
-  "version": "2.0.0",
-  "homepage": "https://github.com/thomasfr/node-konsole",
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/thomasfr/node-konsole.git"
-  },
-  "main": "index.js",
-  "engines": {
-    "node": "~0.6.8"
-  },
-  "dependencies": {},
-  "devDependencies": {},
-  "optionalDependencies": {}
+    "author":"Thomas Fritz <fritztho@gmail.com> (http://fritzthomas.com)",
+    "name":"konsole",
+    "description":"EventEmitter powered console identical API for better logging and debugging capabalities in libraries and modules.",
+    "version":"2.1.0",
+    "homepage":"https://github.com/thomasfr/node-konsole",
+    "repository":{
+        "type":"git",
+        "url":"git://github.com/thomasfr/node-konsole.git"
+    },
+    "main":"index.js",
+    "engines":{
+        "node":">= 0.6.0"
+    },
+    "dependencies":{
+    },
+    "devDependencies":{},
+    "optionalDependencies":{},
+    "keywords": ["logging", "debugger", "debug", "log", "console", "event", "tools"]
 }
