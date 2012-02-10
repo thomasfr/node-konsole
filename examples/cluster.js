@@ -3,10 +3,10 @@ var cluster = require('cluster');
 var http = require('http');
 var numCPUs = require('os').cpus().length;
 
-// Without registering any listener to console, nothing will ever be written to stdout or elsewhere. Its completly up to you
-console.on("message", function (level, label, args, pid, pType, trace, diff) {
-    this.write(" " + label + " " + pType + ":" + pid + "\t" + level.toUpperCase() + "\t" + (diff !== null ? "+" + diff + "ms " : "" ) + (trace.path ? "(" + trace.path : "") + (trace.line ? ":" + trace.line + ") " : "") + "'" + this.format.apply(this, args) + "'");
-});
+// Add the defaultListener, which will write every message to stdout.
+// The defaultListener will also check if there is a trace and a diff
+// otherwise it will display a shorter log.
+console.addDefaultListener();
 
 if (cluster.isMaster) {
     // Fork workers.
