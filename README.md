@@ -1,11 +1,29 @@
 # EventEmitter powered debugger and logger for node.js
 
-Konsoles API is identical to the native console object provided by node.js.
-So you can easily switch to `konsole` by replacing all your console calls (e.g.: `console.log`, `console.warn`,
-`console.info`, `console.err`, etc.) with a call to a konsole instance.
+Konsoles aim is not to be Yet Another Full Blown Logging Framework for node.js. It`s aim
+is to remove the decision or make the decision and work easier for any module developer
+of how logging should be done in his module. As a module developer you normally do not
+want to force or dictate the users of your module to use a specific logging library. You
+normally want to let your users choose. But you also want to do some logging and debugging
+since it could be interesting for your module users. Konsole can help you to remove this
+complex decision and task off of you and lets you concentrate on what you really want to
+do. :)
+
+You, as a module developer could just use `console` calls, just as you would normally do.
+Users of your module could easily plug `konsole` in their application - where logging and 
+debugging actually belongs to - listen to the events konsole will fire and let them decide
+what to do with the logs and debug output. Maybe they want to use `winston` or any other 
+logging framework. It is all possible, because konsole will just emit an event for every 
+call to any console method.
+
+To use `konsole` directly you will just have to replace all your console calls 
+(e.g.: `console.log`, `console.warn`, `console.info`, `console.err`, etc.) with a call to
+a `konsole` instance, because `konsole`s API is identical to the well known native `console`
+object provided by browsers and node.js.
+
 
 ## TL;DR:
-
+### "replace the 'c' with a 'k'"
 
 ```JavaScript
 
@@ -20,7 +38,7 @@ konsole.log("my debug message");
 
 ```
 
-### OR
+### Automatically override console
 
 ```JavaScript
 
@@ -30,13 +48,56 @@ console.log("my debug message");
 
 ```
 
-## Automatic override of `console`
 Since version 2.x you can automatically let `konsole` override your `console` calls.
 So you do not have to replace your console calls as described above if you want that.
 To do so you have to add `require('konsole/overrideConsole')` at the beginning of your module.
 If you do so, all your console calls will emit an `message` event and a event according to the log level
 instead of writing directly to stdout. So a `console.warn` will emit a `message` and a `warn` event. In this case the
 label gets set to the string 'console'.
+
+## Listen for events
+
+```JavaScript
+
+var restoreConsole = require('konsole/overrideConsole');
+
+/**
+ * Default Listener for Konsole
+ * @param level String Level used for logging. log|info|warn|error
+ * @param args Array Original arguments of the konsole.* call
+ * @scope konsole
+ */
+console.on('message', function(level, args) {
+	// Scope within callback is the konsole instance.
+  // you have access to the following additional information:
+  // this.pid         - process id
+  // this.processType - master or worker
+  // this.label       - passed label. 'console' in case of automatic overriding console.
+  // this.trace       - object containing path, line, char, etc. of the actual call
+  // this.diff        - diff in milliseconds to the last call with the same label 
+  // this.write       - shortcut to process.stdout.write(this.format.apply(this, arguments) + '\n');
+  // this.format      - shortcut to util.format
+
+    var trace = this.trace; // trace is a getter, if you do not access the property it will not generate a trace
+    this.write(" " + this.label + " " + this.processType + ":" + this.pid + " " + level.toUpperCase() + " " +
+        "+" + this.diff + "ms " +
+        (trace.path ? "(" + trace.path : "") +
+        (trace.line ? ":" + trace.line + ") " : "") + "'" +
+        this.format.apply(this, args) + "'");
+
+});
+
+.
+.
+.
+
+// Somewhere in your or any other modules code:
+console.warn("Take a look at me. I made something terrible maybe");
+
+// Will output something like:
+// console master:1234 WARN +200ms (/home/developer/projects/MyApp/node_modules/bar/lib/plugins/bar.js:3456) 'Take a look at me. I made something terrible maybe'
+
+```
 
 Take a look at the examples folder for a better understanding of how konsole should be used.
 
