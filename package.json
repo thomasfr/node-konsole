@@ -2,7 +2,7 @@
     "author":"Thomas Fritz <fritztho@gmail.com> (http://fritzthomas.com)",
     "name":"konsole",
     "description":"EventEmitter powered console identical API for better logging and debugging capabalities in libraries and modules.",
-    "version":"2.1.0",
+    "version":"2.2.0",
     "homepage":"https://github.com/thomasfr/node-konsole",
     "repository":{
         "type":"git",

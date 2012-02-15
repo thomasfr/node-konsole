@@ -1,1 +1,1 @@
-module.exports = require('./lib/create');
+module.exports = require('./lib/Konsole');
