@@ -1,11 +1,9 @@
-var restoreConsole = require("konsole")();
+var restoreConsole = require("konsole/overrideConsole");
 var cluster = require('cluster');
 var http = require('http');
 var numCPUs = require('os').cpus().length;
 
 // Add the defaultListener, which will write every message to stdout.
-// The defaultListener will also check if there is a trace and a diff
-// otherwise it will display a shorter log.
 console.addDefaultListener();
 
 if (cluster.isMaster) {
