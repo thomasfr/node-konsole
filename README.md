@@ -42,7 +42,7 @@ konsole.log("my debug message");
 
 ```JavaScript
 
-var Konsole = require('konsole/overrideConsole');
+var restoreConsole = require('konsole/overrideConsole');
 
 console.log("my debug message");
 
